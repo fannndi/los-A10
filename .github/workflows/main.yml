@@ -8,7 +8,9 @@ env:
   TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
   BUILD_USER: fannndi
   BUILD_HOST: github
-  CLANG_TRIPLE: aarch64-linux-gnu-
+  CLANG_TRIPLE: aarch64-linux-android-
+  ARCH: arm64
+  SUBARCH: arm64
 
 jobs:
   build:
@@ -48,22 +50,17 @@ jobs:
             pigz protobuf-compiler python-is-python3 python3 python3-mako python3-pip python3-virtualenv \
             rsync unzip wget xz-utils zip zstd
 
-      - name: Download Clang (Android 10)
+      - name: Download Clang (Android 11)
         run: |
           set -e
           if [[ ! -f "clang/bin/clang" || ! -f "clang/bin/ld.lld" ]]; then
             echo "🔽 Downloading Clang..."
             mkdir -p clang
-            wget -q https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/android11-release/clang-r383902b.tar.gz -O - | tar -xz -C clang
+            wget -q https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/android11-release/clang-r383902b1.tar.gz -O - | tar -xz -C clang
           fi
           echo "$GITHUB_WORKSPACE/clang/bin" >> $GITHUB_PATH
           echo "TOOLCHAIN_PATH=$GITHUB_WORKSPACE/clang" >> $GITHUB_ENV
-
-      - name: Install GNU binutils & force AR=ar
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y binutils
-          echo "AR=ar" >> $GITHUB_ENV
+          echo "CLANG_BINDIR=$GITHUB_WORKSPACE/clang/bin" >> $GITHUB_ENV
 
       - name: Get Clang Version
         id: clang
@@ -87,6 +84,19 @@ jobs:
           set -e
           make O=out ARCH=arm64 surya_defconfig
           make O=out ARCH=arm64 olddefconfig
+        
+      - name: Patch Kernel Config
+        run: |
+          echo "🔧 Patching .config..."
+          sed -i \
+            -e 's/^CONFIG_MODVERSIONS=.*/# CONFIG_MODVERSIONS is not set/' \
+            -e 's/^CONFIG_LTO_NONE=y/# CONFIG_LTO_NONE is not set/' \
+            -e 's/^# CONFIG_LTO is not set/CONFIG_LTO=y/' \
+            -e 's/^# CONFIG_LTO_CLANG is not set/CONFIG_LTO_CLANG=y/' \
+            -e '/^CONFIG_LTO_CLANG=y/!a CONFIG_LTO_CLANG=y' \
+            -e '/^CONFIG_LTO=y/!a CONFIG_LTO=y' \
+            out/.config
+          make O=out ARCH=arm64 olddefconfig
 
       - name: Get Kernel Version from .config
         run: |
@@ -98,26 +108,31 @@ jobs:
       - name: Compile Kernel
         run: |
           set -e
-          export CROSS_COMPILE=aarch64-linux-android-
-          export CROSS_COMPILE_ARM32=arm-linux-gnueabi-
+          export PATH=$CLANG_BINDIR:$PATH
           export KBUILD_COMPILER_STRING="${{ steps.clang.outputs.version }}"
+          export CROSS_COMPILE=aarch64-linux-android-
+          export CROSS_COMPILE_ARM32=arm-linux-androideabi-
 
-          make -j$(nproc) O=out \
-            ARCH=arm64 \
+          CPU_CORES=$(nproc)
+          [[ $CPU_CORES -gt 4 ]] && CPU_CORES=4
+
+          make -j$CPU_CORES O=out \
+            ARCH=${{ env.ARCH }} \
+            SUBARCH=${{ env.SUBARCH }} \
             CC=clang \
+            CLANG_TRIPLE=${{ env.CLANG_TRIPLE }} \
+            CLANG_BINDIR=$CLANG_BINDIR \
             LD=ld.lld \
             AS=llvm-as \
-            AR=llvm-ar \
             NM=llvm-nm \
             OBJCOPY=llvm-objcopy \
             OBJDUMP=llvm-objdump \
             STRIP=llvm-strip \
-            CLANG_TRIPLE=${{ env.CLANG_TRIPLE }} \
             LLVM=1 LLVM_IAS=1 \
             KBUILD_VERBOSE=2 \
             KBUILD_BUILD_USER=${{ env.BUILD_USER }} \
             KBUILD_BUILD_HOST=${{ env.BUILD_HOST }} \
-            Image.gz dtbs | tee log.txt
+            Image.gz dtbs > log.txt 2>&1
 
           [ ! -f out/arch/arm64/boot/Image.gz ] && {
             echo "::error ::Image.gz not found!"; exit 1;
