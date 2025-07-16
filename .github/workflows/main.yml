@@ -48,13 +48,13 @@ jobs:
             pigz protobuf-compiler python-is-python3 python3 python3-mako python3-pip python3-virtualenv \
             rsync unzip wget xz-utils zip zstd
 
-      - name: Download Clang r437112b (Android 12)
+      - name: Download Clang (Android 10)
         run: |
           set -e
           if [[ ! -f "clang/bin/clang" || ! -f "clang/bin/ld.lld" ]]; then
             echo "🔽 Downloading Clang..."
             mkdir -p clang
-            wget -q https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/android12-release/clang-r437112b.tar.gz -O - | tar -xz -C clang
+            wget -q https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/android10-release/clang-r383902.tar.gz -O - | tar -xz -C clang
           fi
           echo "$GITHUB_WORKSPACE/clang/bin" >> $GITHUB_PATH
           echo "TOOLCHAIN_PATH=$GITHUB_WORKSPACE/clang" >> $GITHUB_ENV
