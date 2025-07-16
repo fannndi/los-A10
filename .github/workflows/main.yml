@@ -30,12 +30,6 @@ jobs:
           echo "BUILD_START=$(date +%s)" >> $GITHUB_ENV
           echo "TIME=$TIME" >> $GITHUB_ENV
 
-      - name: Validate Defconfig File
-        run: |
-          [ ! -f arch/arm64/configs/surya_defconfig ] && {
-            echo "::error ::Defconfig not found!"; exit 1;
-          }
-
       - name: Create Swap (4GB)
         run: |
           sudo fallocate -l 4G /swapfile
