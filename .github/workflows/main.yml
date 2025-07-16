@@ -8,9 +8,7 @@ env:
   TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
   BUILD_USER: fannndi
   BUILD_HOST: github
-  CLANG_TRIPLE: aarch64-linux-android-
-  ARCH: arm64
-  SUBARCH: arm64
+  CLANG_TRIPLE: aarch64-linux-gnu-
 
 jobs:
   build:
@@ -50,7 +48,7 @@ jobs:
             pigz protobuf-compiler python-is-python3 python3 python3-mako python3-pip python3-virtualenv \
             rsync unzip wget xz-utils zip zstd
 
-      - name: Download Clang (Android 11)
+      - name: Download Clang (Android 10)
         run: |
           set -e
           if [[ ! -f "clang/bin/clang" || ! -f "clang/bin/ld.lld" ]]; then
@@ -60,7 +58,6 @@ jobs:
           fi
           echo "$GITHUB_WORKSPACE/clang/bin" >> $GITHUB_PATH
           echo "TOOLCHAIN_PATH=$GITHUB_WORKSPACE/clang" >> $GITHUB_ENV
-          echo "CLANG_BINDIR=$GITHUB_WORKSPACE/clang/bin" >> $GITHUB_ENV
 
       - name: Get Clang Version
         id: clang
@@ -72,8 +69,8 @@ jobs:
       - name: Telegram - Build Started
         run: |
           MSG="🚀 *Kernel Build Started!*\n"
-          MSG+="🧱 Defconfig: \`surya_defconfig\`\n"
-          MSG+="🛠️ Clang: \`${{ steps.clang.outputs.version }}\`"
+          MSG+="🧱 Defconfig: \surya_defconfig\\n"
+          MSG+="🛠️ Clang: \${{ steps.clang.outputs.version }}\"
           curl -s -X POST https://api.telegram.org/bot${{ env.TELEGRAM_BOT_TOKEN }}/sendMessage \
             -d chat_id=${{ env.TELEGRAM_CHAT_ID }} \
             -d text="$MSG" \
@@ -85,6 +82,16 @@ jobs:
           make O=out ARCH=arm64 surya_defconfig
           make O=out ARCH=arm64 olddefconfig
 
+      - name: Experimental Options
+        run: |
+          chmod +x scripts/config
+          scripts/config --file out/.config \
+            --disable MODVERSIONS \
+            --enable LTO \
+            --enable LTO_CLANG \
+            --disable LTO_NONE
+          make O=out ARCH=arm64 olddefconfig
+
       - name: Get Kernel Version from .config
         run: |
           VERSION=$(grep -oP '(?<=CONFIG_LOCALVERSION=")([^"]+)' out/.config || git rev-parse --short HEAD)
@@ -92,34 +99,22 @@ jobs:
           echo "ZIPNAME=$ZIPNAME" >> $GITHUB_ENV
           echo "KERNEL_VERSION=$VERSION" >> $GITHUB_ENV
 
-      - name: Debug Clang Path
-        run: |
-          echo "CLANG_BINDIR: $CLANG_BINDIR"
-          ls -l "$CLANG_BINDIR/clang" || echo "❌ clang not found"
-
       - name: Compile Kernel
         run: |
           set -e
-          export PATH=$CLANG_BINDIR:$PATH
-          export KBUILD_COMPILER_STRING="${{ steps.clang.outputs.version }}"
           export CROSS_COMPILE=aarch64-linux-android-
-          export CROSS_COMPILE_ARM32=arm-linux-androideabi-
+          export CROSS_COMPILE_ARM32=arm-linux-gnueabi-
+          export KBUILD_COMPILER_STRING="${{ steps.clang.outputs.version }}"
 
           CPU_CORES=$(nproc)
           [[ $CPU_CORES -gt 4 ]] && CPU_CORES=4
 
           make -j$CPU_CORES O=out \
-            ARCH=${{ env.ARCH }} \
-            SUBARCH=${{ env.SUBARCH }} \
+            ARCH=arm64 \
             CC=clang \
-            CLANG_TRIPLE=${{ env.CLANG_TRIPLE }} \
-            CLANG_BINDIR=$CLANG_BINDIR \
             LD=ld.lld \
             AS=llvm-as \
-            NM=llvm-nm \
-            OBJCOPY=llvm-objcopy \
-            OBJDUMP=llvm-objdump \
-            STRIP=llvm-strip \
+            CLANG_TRIPLE=${{ env.CLANG_TRIPLE }} \
             LLVM=1 LLVM_IAS=1 \
             KBUILD_VERBOSE=2 \
             KBUILD_BUILD_USER=${{ env.BUILD_USER }} \
@@ -162,7 +157,7 @@ jobs:
         run: |
           DURATION=$(( $(date +%s) - ${{ env.BUILD_START }} ))
           MSG="✅ *Kernel Build Success!*\n"
-          MSG+="📦 *Name:* \`${{ env.ZIPNAME }}\`\n"
+          MSG+="📦 *Name:* \${{ env.ZIPNAME }}\\n"
           MSG+="🕒 *Duration:* ${DURATION}s\n"
 
           curl -s -X POST https://api.telegram.org/bot${{ env.TELEGRAM_BOT_TOKEN }}/sendMessage \
@@ -181,7 +176,7 @@ jobs:
           STATUS="Build Log"
           [[ failure() ]] && STATUS="❌ Failed Log"
           curl -s -F document=@log.txt \
-            -F caption="📄 $STATUS\n🆔 \`${{ env.BUILD_ID }}\`" \
+            -F caption="📄 $STATUS\n🆔 \${{ env.BUILD_ID }}\" \
             -F chat_id=${{ env.TELEGRAM_CHAT_ID }} \
             https://api.telegram.org/bot${{ env.TELEGRAM_BOT_TOKEN }}/sendDocument
 
