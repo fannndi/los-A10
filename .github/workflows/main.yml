@@ -92,6 +92,11 @@ jobs:
           echo "ZIPNAME=$ZIPNAME" >> $GITHUB_ENV
           echo "KERNEL_VERSION=$VERSION" >> $GITHUB_ENV
 
+      - name: Debug Clang Path
+        run: |
+          echo "CLANG_BINDIR: $CLANG_BINDIR"
+          ls -l "$CLANG_BINDIR/clang" || echo "❌ clang not found"
+
       - name: Compile Kernel
         run: |
           set -e
