@@ -69,8 +69,8 @@ jobs:
       - name: Telegram - Build Started
         run: |
           MSG="🚀 *Kernel Build Started!*\n"
-          MSG+="🧱 Defconfig: \surya_defconfig\\n"
-          MSG+="🛠️ Clang: \${{ steps.clang.outputs.version }}\"
+          MSG+="🧱 Defconfig: surya_defconfig\n"
+          MSG+="🛠️ Clang: ${{ steps.clang.outputs.version }}\n"
           curl -s -X POST https://api.telegram.org/bot${{ env.TELEGRAM_BOT_TOKEN }}/sendMessage \
             -d chat_id=${{ env.TELEGRAM_CHAT_ID }} \
             -d text="$MSG" \
@@ -147,7 +147,7 @@ jobs:
         run: |
           DURATION=$(( $(date +%s) - ${{ env.BUILD_START }} ))
           MSG="✅ *Kernel Build Success!*\n"
-          MSG+="📦 *Name:* \${{ env.ZIPNAME }}\\n"
+          MSG+="📦 *Name:* ${{ env.ZIPNAME }}\n"
           MSG+="🕒 *Duration:* ${DURATION}s\n"
 
           curl -s -X POST https://api.telegram.org/bot${{ env.TELEGRAM_BOT_TOKEN }}/sendMessage \
@@ -166,7 +166,7 @@ jobs:
           STATUS="Build Log"
           [[ failure() ]] && STATUS="❌ Failed Log"
           curl -s -F document=@log.txt \
-            -F caption="📄 $STATUS\n🆔 \${{ env.BUILD_ID }}\" \
+            -F caption="📄 $STATUS\n🆔 ${{ env.BUILD_ID }}" \
             -F chat_id=${{ env.TELEGRAM_CHAT_ID }} \
             https://api.telegram.org/bot${{ env.TELEGRAM_BOT_TOKEN }}/sendDocument
 
