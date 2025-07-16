@@ -98,7 +98,7 @@ jobs:
       - name: Compile Kernel
         run: |
           set -e
-          export CROSS_COMPILE=aarch64-linux-gnu-
+          export CROSS_COMPILE=aarch64-linux-android-
           export CROSS_COMPILE_ARM32=arm-linux-gnueabi-
           export KBUILD_COMPILER_STRING="${{ steps.clang.outputs.version }}"
 
