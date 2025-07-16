@@ -85,12 +85,14 @@ jobs:
           make O=out ARCH=arm64 surya_defconfig
           make O=out ARCH=arm64 olddefconfig
         
-      - name: Patch Kernel Config
-        run: |
-          echo "🔧 Patching .config..."
-          sed -i \
-            -e 's/^CONFIG_MODVERSIONS=.*/# CONFIG_MODVERSIONS is not set/' \
-            out/.config
+      - name: Experimental Options
+          run: |
+          chmod +x scripts/config
+          scripts/config --file out/.config \
+            --disable MODVERSIONS \
+            --enable LTO \
+            --enable LTO_CLANG \
+            --disable LTO_NONE
           make O=out ARCH=arm64 olddefconfig
 
       - name: Get Kernel Version from .config
