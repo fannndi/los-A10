@@ -59,6 +59,12 @@ jobs:
           echo "$GITHUB_WORKSPACE/clang/bin" >> $GITHUB_PATH
           echo "TOOLCHAIN_PATH=$GITHUB_WORKSPACE/clang" >> $GITHUB_ENV
 
+      - name: Install GNU binutils & force AR=ar
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y binutils
+          echo "AR=ar" >> $GITHUB_ENV
+
       - name: Get Clang Version
         id: clang
         run: echo "version=$(clang/bin/clang --version | head -n1)" >> $GITHUB_OUTPUT
