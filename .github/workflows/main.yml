@@ -90,11 +90,6 @@ jobs:
           echo "🔧 Patching .config..."
           sed -i \
             -e 's/^CONFIG_MODVERSIONS=.*/# CONFIG_MODVERSIONS is not set/' \
-            -e 's/^CONFIG_LTO_NONE=y/# CONFIG_LTO_NONE is not set/' \
-            -e 's/^# CONFIG_LTO is not set/CONFIG_LTO=y/' \
-            -e 's/^# CONFIG_LTO_CLANG is not set/CONFIG_LTO_CLANG=y/' \
-            -e '/^CONFIG_LTO_CLANG=y/!a CONFIG_LTO_CLANG=y' \
-            -e '/^CONFIG_LTO=y/!a CONFIG_LTO=y' \
             out/.config
           make O=out ARCH=arm64 olddefconfig
 
