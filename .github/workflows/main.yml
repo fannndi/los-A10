@@ -68,7 +68,7 @@ jobs:
 
       - name: Telegram - Build Started
         run: |
-          MSG="🚀 *Kernel Build Started!*\n"
+          MSG="🚀 *Kernel Build Started!*\\n"
           MSG+="🧱 Defconfig: \surya_defconfig\\n"
           MSG+="🛠️ Clang: \${{ steps.clang.outputs.version }}\"
           curl -s -X POST https://api.telegram.org/bot${{ env.TELEGRAM_BOT_TOKEN }}/sendMessage \
