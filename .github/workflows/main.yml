@@ -8,7 +8,7 @@ env:
   TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
   BUILD_USER: fannndi
   BUILD_HOST: github
-  CLANG_TRIPLE: aarch64-linux-gnu-
+  CLANG_TRIPLE: aarch64-linux-android-
 
 jobs:
   build:
