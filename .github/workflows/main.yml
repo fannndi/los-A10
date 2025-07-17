@@ -113,10 +113,10 @@ jobs:
             KBUILD_VERBOSE=2 \
             KBUILD_BUILD_USER=${{ env.BUILD_USER }} \
             KBUILD_BUILD_HOST=${{ env.BUILD_HOST }} \
-            Image.gz dtbs | tee log.txt
+            Image dtbs | tee log.txt
 
-          test -f out/arch/arm64/boot/Image.gz || {
-            echo "::error ::Kernel image not found!"
+          test -f out/arch/arm64/boot/Image || {
+            echo "::error ::Kernel Image not found!"
             exit 1
           }
 
@@ -125,9 +125,18 @@ jobs:
 
       - name: Create Kernel Images
         run: |
+          echo "📦 Creating Image.gz-dtb..."
+
+          # Gzip the Image manually
+          gzip -c9 out/arch/arm64/boot/Image > out/arch/arm64/boot/Image.gz
+
+          # Merge Image.gz + dtbs
           cat out/arch/arm64/boot/Image.gz out/arch/arm64/boot/dts/**/*.dtb > Image.gz-dtb
+
+          # Optional: build dtb.img for compatibility
           find out/arch/arm64/boot/dts -name '*.dtb' | sort | xargs cat > dtb.img
 
+          # Optional: build dtbo.img if needed
           DTBO_FILES=$(find out/arch/arm64/boot/dts -name '*.dtbo')
           if [[ -n "$DTBO_FILES" ]]; then
             mkdir -p overlay
