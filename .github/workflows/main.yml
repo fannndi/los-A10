@@ -4,8 +4,6 @@ on:
   workflow_dispatch:
 
 env:
-  TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-  TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
   BUILD_USER: fannndi
   BUILD_HOST: github
 
@@ -73,17 +71,6 @@ jobs:
           echo "ARCH=arm64" >> $GITHUB_ENV
           echo "SUBARCH=arm64" >> $GITHUB_ENV
 
-      - name: Telegram - Build Started
-        shell: bash
-        run: |
-          MSG="🚀 *Kernel Build Started!*\n"
-          MSG+="🧱 Defconfig: \`surya_defconfig\`\n"
-          MSG+="🛠️ Clang: \`r416183b\`"
-          curl -s -X POST https://api.telegram.org/bot${{ env.TELEGRAM_BOT_TOKEN }}/sendMessage \
-            -d chat_id=${{ env.TELEGRAM_CHAT_ID }} \
-            -d text="$MSG" \
-            -d parse_mode=Markdown
-
       - name: Clean & Setup
         run: |
           make mrproper
@@ -130,36 +117,10 @@ jobs:
           cd AnyKernel3
           zip -r9 ../MIUI-A10-${{ env.TIME }}.zip ./* -x '*.git*' README.md *placeholder
 
-      - name: Telegram - Build Success
-        if: success()
-        shell: bash
-        run: |
-          DURATION=$(( $(date +%s) - ${{ env.BUILD_START }} ))
-          MSG="✅ *Kernel Build Success!*\n"
-          MSG+="🕒 *Time:* ${DURATION}s\n"
-          MSG+="📦 *File:* \`MIUI-A10-${{ env.TIME }}.zip\`"
-          curl -s -X POST https://api.telegram.org/bot${{ env.TELEGRAM_BOT_TOKEN }}/sendMessage \
-            -d chat_id=${{ env.TELEGRAM_CHAT_ID }} \
-            -d text="$MSG" \
-            -d parse_mode=Markdown
-          curl -s -F document=@MIUI-A10-${{ env.TIME }}.zip \
-            -F caption="✅ Kernel Zip" \
-            -F chat_id=${{ env.TELEGRAM_CHAT_ID }} \
-            https://api.telegram.org/bot${{ env.TELEGRAM_BOT_TOKEN }}/sendDocument
-
-      - name: Telegram - Log Upload
-        if: always()
-        shell: bash
-        run: |
-          curl -s -F document=@log.txt \
-            -F caption="📄 Build Log" \
-            -F chat_id=${{ env.TELEGRAM_CHAT_ID }} \
-            https://api.telegram.org/bot${{ env.TELEGRAM_BOT_TOKEN }}/sendDocument
-
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: Kernel Image
+          name: Kernel Output
           path: |
             MIUI-A10-${{ env.TIME }}.zip
             log.txt
