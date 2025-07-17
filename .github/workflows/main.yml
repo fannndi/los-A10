@@ -75,6 +75,7 @@ jobs:
 
       - name: Make Defconfig
         run: |
+          make mrproper
           make O=out ARCH=arm64 surya_defconfig
           make O=out ARCH=arm64 olddefconfig
 
