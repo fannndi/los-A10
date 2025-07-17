@@ -79,6 +79,14 @@ jobs:
           echo -e "\n📦 Clang version:" && clang --version
           echo -e "\n🎯 Clang target default:" && clang -v 2>&1 | grep Target:
           echo -e "\n📁 Triple binaries in clang/bin:" && ls clang/bin | grep aarch64 || true
+          
+          echo -e "\n💡 Checking compiler tools being used:"
+          echo "💡 HOSTCC: $HOSTCC"
+          echo "💡 HOSTCXX: $HOSTCXX"
+          echo "💡 CC: $CC"
+          echo "💡 Which gcc: $(which gcc)"
+          echo "💡 GCC version (if present):"
+          gcc --version || echo "⚠️ GCC not found"
 
       - name: Compile Kernel (Image.gz-dtb only)
         run: |
