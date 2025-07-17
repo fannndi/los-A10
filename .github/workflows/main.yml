@@ -4,127 +4,68 @@ on:
   workflow_dispatch:
 
 env:
-  BUILD_USER: fannndi
-  BUILD_HOST: github
+  DEFCONFIG: surya_defconfig
+  KERNEL_NAME: NOS
+  DEVICE: Surya
 
 jobs:
   build:
-    name: Compile Kernel
+    name: Build Kernel
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Source
-        uses: actions/checkout@v3
-
-      - name: Set Timezone & Vars
+      - name: 🧹 Clean workspace
         run: |
-          sudo ln -sf /usr/share/zoneinfo/Asia/Jakarta /etc/localtime
-          echo "TIME=$(date '+%Y%m%d-%H%M')" >> $GITHUB_ENV
-          echo "BUILD_ID=$(date '+%Y%m%d%H%M%S')" >> $GITHUB_ENV
-          echo "BUILD_START=$(date +%s)" >> $GITHUB_ENV
+          rm -rf *
 
-      - name: Add 4GB Swap
-        run: |
-          sudo fallocate -l 4G /swapfile
-          sudo chmod 600 /swapfile
-          sudo mkswap /swapfile
-          sudo swapon /swapfile
+      - name: 📥 Checkout kernel source
+        uses: actions/checkout@v4
 
-      - name: Install Dependencies
-        run: |
-          sudo apt update
-          sudo apt install -y \
-            bc build-essential bison ccache curl flex git libssl-dev \
-            libncurses-dev libxml2-utils lzop python-is-python3 rsync \
-            unzip zip wget xz-utils make clang lld libelf-dev \
-            device-tree-compiler elfutils
-
-      - name: Download Clang
+      - name: 📦 Setup Clang r383902b
         run: |
           mkdir -p clang
-          wget -q https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/main/clang-r536225.tar.gz -O - | tar -xz -C clang
-          echo "$GITHUB_WORKSPACE/clang/bin" >> $GITHUB_PATH
+          curl -LO https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+/refs/heads/master/clang-r383902b.tar.gz?format=TEXT
+          base64 -d clang-r383902b.tar.gz?format=TEXT > clang.tar.gz
+          tar -C clang -xzf clang.tar.gz
 
-      - name: Download GCC Toolchains
+      - name: 📦 Setup GCC 4.9 toolchain
         run: |
-          git clone --depth=1 -b lineage-19.1 https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_aarch64_aarch64-linux-android-4.9.git gcc64
-          git clone --depth=1 -b lineage-19.1 https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_arm_arm-linux-androideabi-4.9.git gcc32
-          echo "$GITHUB_WORKSPACE/gcc64/bin" >> $GITHUB_PATH
-          echo "$GITHUB_WORKSPACE/gcc32/bin" >> $GITHUB_PATH
+          mkdir -p toolchain
+          git clone --depth=1 -b lineage-19.1 https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_aarch64_aarch64-linux-android-4.9.git toolchain/gcc64
+          git clone --depth=1 -b lineage-19.1 https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_arm_arm-linux-androideabi-4.9.git toolchain/gcc32
 
-      - name: Export Build Environment
+      - name: ⚙️ Prepare environment
         run: |
-          echo "PATH=$GITHUB_WORKSPACE/clang/bin:$GITHUB_WORKSPACE/gcc64/bin:$GITHUB_WORKSPACE/gcc32/bin:\$PATH" >> $GITHUB_ENV
-          echo "ARCH=arm64" >> $GITHUB_ENV
-          echo "SUBARCH=arm64" >> $GITHUB_ENV
-          echo "CLANG_TRIPLE=aarch64-linux-gnu-" >> $GITHUB_ENV
-          echo "CROSS_COMPILE=$GITHUB_WORKSPACE/gcc64/bin/aarch64-linux-android-" >> $GITHUB_ENV
-          echo "CROSS_COMPILE_COMPAT=$GITHUB_WORKSPACE/gcc32/bin/arm-linux-androideabi-" >> $GITHUB_ENV
-          echo "LD=ld.lld" >> $GITHUB_ENV
-          echo "AR=llvm-ar" >> $GITHUB_ENV
-          echo "AS=llvm-as" >> $GITHUB_ENV
-          echo "NM=llvm-nm" >> $GITHUB_ENV
-          echo "OBJCOPY=llvm-objcopy" >> $GITHUB_ENV
-          echo "OBJDUMP=llvm-objdump" >> $GITHUB_ENV
-          echo "STRIP=llvm-strip" >> $GITHUB_ENV
-          echo "CC=clang" >> $GITHUB_ENV
-          echo "HOSTCC=clang" >> $GITHUB_ENV
-          echo "HOSTCXX=clang++" >> $GITHUB_ENV
+          echo "CLANG_PATH=$(pwd)/clang/clang-r383902b" >> $GITHUB_ENV
+          echo "GCC64_PATH=$(pwd)/toolchain/gcc64" >> $GITHUB_ENV
+          echo "GCC32_PATH=$(pwd)/toolchain/gcc32" >> $GITHUB_ENV
+          echo "OUT_DIR=$(pwd)/out" >> $GITHUB_ENV
 
-      - name: Clean & Setup
+      - name: 🛠️ Build Image.gz-dtb
         run: |
-          make mrproper
-          rm -rf out *.zip AnyKernel3 log.txt defconfig_snapshot.config
+          export PATH="$CLANG_PATH/bin:$PATH"
+          export LD_LIBRARY_PATH="$CLANG_PATH/lib:$LD_LIBRARY_PATH"
+          export KBUILD_BUILD_USER="Mahirooo"
+          export KBUILD_BUILD_HOST="hirateam"
 
-      - name: Setup Defconfig
-        run: |
-          make O=out ARCH=arm64 surya_defconfig
+          make O=$OUT_DIR ARCH=arm64 $DEFCONFIG
+          make -j$(nproc) O=$OUT_DIR \
+              ARCH=arm64 \
+              CC=clang \
+              LD=ld.lld \
+              AR=llvm-ar \
+              AS=llvm-as \
+              NM=llvm-nm \
+              OBJCOPY=llvm-objcopy \
+              OBJDUMP=llvm-objdump \
+              STRIP=llvm-strip \
+              CROSS_COMPILE=$GCC64_PATH/bin/aarch64-linux-android- \
+              CROSS_COMPILE_COMPAT=$GCC32_PATH/bin/arm-linux-androideabi- \
+              CLANG_TRIPLE=aarch64-linux-gnu- \
+              Image.gz-dtb
 
-      - name: Debug Compiler Info
-        run: |
-          echo "🔧 Clang path: $(which clang)"
-          echo "📦 Clang version:"
-          clang --version
-          echo "🎯 Target triple test:"
-          clang -v 2>&1 | grep Target:
-          echo "💡 HOSTCC=$HOSTCC"
-          echo "💡 CROSS_COMPILE=$CROSS_COMPILE"
-          echo "💡 CROSS_COMPILE_COMPAT=$CROSS_COMPILE_COMPAT"
-
-      - name: Compile Kernel (Image.gz-dtb only)
-        run: |
-          make -j$(nproc) O=out \
-            ARCH=arm64 \
-            CC=clang \
-            CLANG_TRIPLE=aarch64-linux-gnu- \
-            CROSS_COMPILE=$GITHUB_WORKSPACE/gcc64/bin/aarch64-linux-android- \
-            CROSS_COMPILE_COMPAT=$GITHUB_WORKSPACE/gcc32/bin/arm-linux-androideabi- \
-            Image.gz-dtb | tee log.txt
-
-          if [ ! -f out/arch/arm64/boot/Image.gz-dtb ]; then
-            echo "::error ::Image.gz-dtb not generated!"
-            exit 1
-          fi
-
-      - name: Save Final .config
-        run: cp out/.config defconfig_snapshot.config
-
-      - name: Package with AnyKernel3
-        run: |
-          git clone --depth=1 https://github.com/rinnsakaguchi/AnyKernel3 -b FSociety
-          cp out/arch/arm64/boot/Image.gz-dtb AnyKernel3/
-          cd AnyKernel3
-          zip -r9 ../MIUI-A10-${{ env.TIME }}.zip ./* -x '*.git*' README.md *placeholder
-
-      - name: Upload Artifacts
+      - name: 📁 Upload compiled Image.gz-dtb
         uses: actions/upload-artifact@v4
         with:
-          name: Kernel A10 Output
-          path: |
-            MIUI-A10-${{ env.TIME }}.zip
-            log.txt
-            defconfig_snapshot.config
-
-      - name: Turn off Swap
-        if: always()
-        run: sudo swapoff /swapfile
+          name: Image.gz-dtb
+          path: out/arch/arm64/boot/Image.gz-dtb
