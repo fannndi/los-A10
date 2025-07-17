@@ -94,49 +94,44 @@ jobs:
 
       - name: Compile Kernel
         run: |
-          export CROSS_COMPILE=aarch64-linux-gnu-
-          export CROSS_COMPILE_ARM32=arm-linux-gnueabi-
+          export CROSS_COMPILE=aarch64-linux-android-
+          export CROSS_COMPILE_COMPAT=arm-linux-gnueabi-
           export KBUILD_COMPILER_STRING="${{ steps.clang.outputs.version }}"
+
+          echo -e "\n📦 Starting compilation...\n"
 
           make -j$(nproc) O=out \
             ARCH=arm64 \
             CC=clang \
             LD=ld.lld \
-            AS=llvm-as \
             AR=llvm-ar \
+            AS=llvm-as \
             NM=llvm-nm \
             OBJCOPY=llvm-objcopy \
             OBJDUMP=llvm-objdump \
             STRIP=llvm-strip \
-            CLANG_TRIPLE=${{ env.CLANG_TRIPLE }} \
-            LLVM=1 LLVM_IAS=1 \
-            KBUILD_VERBOSE=2 \
-            KBUILD_BUILD_USER=${{ env.BUILD_USER }} \
-            KBUILD_BUILD_HOST=${{ env.BUILD_HOST }} \
-            Image dtbs | tee log.txt
+            CROSS_COMPILE=aarch64-linux-android- \
+            CROSS_COMPILE_COMPAT=arm-linux-gnueabi- \
+            CLANG_TRIPLE=aarch64-linux-gnu- \
+            KCFLAGS="-Wno-error" \
+            LOCALVERSION= \
+            Image.gz-dtb | tee log.txt
 
-          test -f out/arch/arm64/boot/Image || {
-            echo "::error ::Kernel Image not found!"
+          if [ ! -f out/arch/arm64/boot/Image.gz-dtb ]; then
+            echo "::error ::Image.gz-dtb not generated!"
             exit 1
-          }
+          fi
 
       - name: Save Final .config
         run: cp out/.config defconfig_snapshot.config
 
       - name: Create Kernel Images
         run: |
-          echo "📦 Creating Image.gz-dtb..."
+          echo "✅ Kernel compiled successfully! Preparing images..."
+          cp out/arch/arm64/boot/Image.gz-dtb ./
 
-          # Gzip the Image manually
-          gzip -c9 out/arch/arm64/boot/Image > out/arch/arm64/boot/Image.gz
-
-          # Merge Image.gz + dtbs
-          cat out/arch/arm64/boot/Image.gz out/arch/arm64/boot/dts/**/*.dtb > Image.gz-dtb
-
-          # Optional: build dtb.img for compatibility
           find out/arch/arm64/boot/dts -name '*.dtb' | sort | xargs cat > dtb.img
 
-          # Optional: build dtbo.img if needed
           DTBO_FILES=$(find out/arch/arm64/boot/dts -name '*.dtbo')
           if [[ -n "$DTBO_FILES" ]]; then
             mkdir -p overlay
