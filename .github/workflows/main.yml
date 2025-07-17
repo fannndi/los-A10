@@ -77,6 +77,8 @@ jobs:
       - name: Compile Kernel (Image.gz-dtb only)
         run: |
           echo -e "\n📦 Starting compilation...\n"
+          export PATH="$(pwd)/clang/bin:$PATH"
+          export CLANG_TRIPLE=aarch64-linux-android-
           make -j$(nproc) O=out \
             ARCH=arm64 \
             CC=clang \
