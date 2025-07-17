@@ -91,7 +91,8 @@ jobs:
           echo -e "\n📦 Starting compilation...\n"
           make -j$(nproc) O=out \
             ARCH=arm64 \
-            CC="clang --target=aarch64-linux-android" \
+            CC=clang \
+            HOSTCC=clang \
             LD=ld.lld \
             AR=llvm-ar \
             AS=llvm-as \
@@ -101,6 +102,7 @@ jobs:
             STRIP=llvm-strip \
             CROSS_COMPILE=aarch64-linux-android- \
             CROSS_COMPILE_COMPAT=arm-linux-gnueabi- \
+            CLANG_TRIPLE=aarch64-linux-gnu- \
             LOCALVERSION= \
             KCFLAGS="-Wno-error" \
             Image.gz-dtb | tee log.txt
