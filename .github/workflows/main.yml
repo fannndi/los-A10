@@ -119,12 +119,12 @@ jobs:
           path: clang
           key: clang-r536225
 
-      - name: Check & Download Clang r536225 (Android 15)
+      - name: Check & Download
         run: |
           if [[ ! -f "clang/bin/clang" || ! -f "clang/bin/ld.lld" ]]; then
             echo "🔽 Downloading Clang..."
             mkdir -p clang
-            wget -q https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/main/clang-r536225.tar.gz -O - | tar -xz -C clang
+            wget -q https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/android11-release/clang-r383902b.tar.gz -O - | tar -xz -C clang
           fi
           echo "$GITHUB_WORKSPACE/clang/bin" >> $GITHUB_PATH
           echo "TOOLCHAIN_PATH=$GITHUB_WORKSPACE/clang" >> $GITHUB_ENV
@@ -215,6 +215,21 @@ jobs:
 
       - name: Save Final .config Snapshot
         run: cp out/.config defconfig_snapshot.config
+
+      - name: 🔎 Debug Clang Info
+        run: |
+          echo "🔧 Clang location:" && which clang
+          echo -e "\n📦 Clang version:" && clang --version
+          echo -e "\n🎯 Clang target default:" && clang -v 2>&1 | grep Target:
+          echo -e "\n📁 Triple binaries in clang/bin:" && ls clang/bin | grep aarch64 || true
+          
+          echo -e "\n💡 Checking compiler tools being used:"
+          echo "💡 HOSTCC: $HOSTCC"
+          echo "💡 HOSTCXX: $HOSTCXX"
+          echo "💡 CC: $CC"
+          echo "💡 Which gcc: $(which gcc)"
+          echo "💡 GCC version (if present):"
+          gcc --version || echo "⚠️ GCC not found"
 
       - name: Telegram - Send Final .config Snapshot
         if: success()
