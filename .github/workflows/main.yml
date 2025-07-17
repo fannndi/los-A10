@@ -20,6 +20,7 @@ jobs:
         run: |
           sudo ln -sf /usr/share/zoneinfo/Asia/Jakarta /etc/localtime
           echo "TIME=$(date '+%Y%m%d-%H%M')" >> $GITHUB_ENV
+          echo "BUILD_ID=$(date '+%Y%m%d%H%M%S')" >> $GITHUB_ENV
           echo "BUILD_START=$(date +%s)" >> $GITHUB_ENV
 
       - name: Add 4GB Swap
@@ -38,10 +39,10 @@ jobs:
             unzip zip wget xz-utils make clang lld libelf-dev \
             device-tree-compiler elfutils
 
-      - name: Download Clang (r416183b)
+      - name: Download Clang (r416183b - A11)
         run: |
           mkdir -p clang
-          wget -q https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/android12-release/clang-r416183b.tar.gz -O - | tar -xz -C clang
+          wget -q https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/android11-release/clang-r416183b.tar.gz -O - | tar -xz -C clang
           echo "$GITHUB_WORKSPACE/clang/bin" >> $GITHUB_PATH
 
       - name: Download GCC Toolchains
@@ -53,7 +54,9 @@ jobs:
 
       - name: Export Build Environment
         run: |
-          echo "PATH=$GITHUB_WORKSPACE/clang/bin:$GITHUB_WORKSPACE/gcc64/bin:$GITHUB_WORKSPACE/gcc32/bin:$PATH" >> $GITHUB_ENV
+          echo "PATH=$GITHUB_WORKSPACE/clang/bin:$GITHUB_WORKSPACE/gcc64/bin:$GITHUB_WORKSPACE/gcc32/bin:\$PATH" >> $GITHUB_ENV
+          echo "ARCH=arm64" >> $GITHUB_ENV
+          echo "SUBARCH=arm64" >> $GITHUB_ENV
           echo "CLANG_TRIPLE=aarch64-linux-gnu-" >> $GITHUB_ENV
           echo "CROSS_COMPILE=$GITHUB_WORKSPACE/gcc64/bin/aarch64-linux-android-" >> $GITHUB_ENV
           echo "CROSS_COMPILE_COMPAT=$GITHUB_WORKSPACE/gcc32/bin/arm-linux-androideabi-" >> $GITHUB_ENV
@@ -67,8 +70,6 @@ jobs:
           echo "CC=clang" >> $GITHUB_ENV
           echo "HOSTCC=clang" >> $GITHUB_ENV
           echo "HOSTCXX=clang++" >> $GITHUB_ENV
-          echo "ARCH=arm64" >> $GITHUB_ENV
-          echo "SUBARCH=arm64" >> $GITHUB_ENV
 
       - name: Clean & Setup
         run: |
@@ -79,25 +80,25 @@ jobs:
         run: |
           make O=out ARCH=arm64 surya_defconfig
 
-      - name: 🔎 Debug Compiler Info
+      - name: Debug Compiler Info
         run: |
-          echo "🔧 Clang location: $(which clang)"
-          echo -e "\n📦 Clang version:\n$(clang --version)"
-          echo -e "\n🎯 Clang target default:" && clang -v 2>&1 | grep Target:
-          echo -e "\n📁 Triple binaries in clang/bin:" && ls clang/bin | grep aarch64 || true
-
-          echo -e "\n💡 Checking compiler tools being used:"
-          echo "💡 HOSTCC: $HOSTCC"
-          echo "💡 HOSTCXX: $HOSTCXX"
-          echo "💡 CC: $CC"
-          echo "💡 Which gcc: $(which gcc)"
-          gcc --version || echo "⚠️ GCC not found"
+          echo "🔧 Clang path: $(which clang)"
+          echo "📦 Clang version:"
+          clang --version
+          echo "🎯 Target triple test:"
+          clang -v 2>&1 | grep Target:
+          echo "💡 HOSTCC=$HOSTCC"
+          echo "💡 CROSS_COMPILE=$CROSS_COMPILE"
+          echo "💡 CROSS_COMPILE_COMPAT=$CROSS_COMPILE_COMPAT"
 
       - name: Compile Kernel (Image.gz-dtb only)
         run: |
-          echo -e "\n📦 Starting compilation...\n"
           make -j$(nproc) O=out \
             ARCH=arm64 \
+            CC=clang \
+            CLANG_TRIPLE=aarch64-linux-gnu- \
+            CROSS_COMPILE=$GITHUB_WORKSPACE/gcc64/bin/aarch64-linux-android- \
+            CROSS_COMPILE_COMPAT=$GITHUB_WORKSPACE/gcc32/bin/arm-linux-androideabi- \
             Image.gz-dtb | tee log.txt
 
           if [ ! -f out/arch/arm64/boot/Image.gz-dtb ]; then
@@ -118,7 +119,7 @@ jobs:
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: Kernel Build Output
+          name: Kernel A10 Output
           path: |
             MIUI-A10-${{ env.TIME }}.zip
             log.txt
