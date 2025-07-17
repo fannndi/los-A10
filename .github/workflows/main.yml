@@ -46,12 +46,12 @@ jobs:
             pigz protobuf-compiler python-is-python3 python3 python3-mako python3-pip python3-virtualenv \
             rsync unzip wget xz-utils zip zstd
 
-      - name: Download Clang r536225 (Android 15)
+      - name: Download Clang (Android 11)
         run: |
           if [[ ! -f "clang/bin/clang" || ! -f "clang/bin/ld.lld" ]]; then
             echo "🔽 Downloading Clang..."
             mkdir -p clang
-            wget -q https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/main/clang-r536225.tar.gz -O - | tar -xz -C clang
+            wget -q https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/android11-release/clang-r383902b.tar.gz -O - | tar -xz -C clang
           fi
           echo "$GITHUB_WORKSPACE/clang/bin" >> $GITHUB_PATH
           echo "TOOLCHAIN_PATH=$GITHUB_WORKSPACE/clang" >> $GITHUB_ENV
@@ -84,6 +84,16 @@ jobs:
           ZIPNAME="MIUI-A10-${VERSION}-${TIME}.zip"
           echo "ZIPNAME=$ZIPNAME" >> $GITHUB_ENV
           echo "KERNEL_VERSION=$VERSION" >> $GITHUB_ENV
+
+      - name: Experimental Options
+        run: |
+          chmod +x scripts/config
+          scripts/config --file out/.config \
+            --disable MODVERSIONS \
+            --enable LTO \
+            --enable LTO_CLANG \
+            --disable LTO_NONE
+          make O=out ARCH=arm64 olddefconfig
 
       - name: Compile Kernel
         run: |
