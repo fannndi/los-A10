@@ -21,10 +21,8 @@ jobs:
       - name: Set Timezone & Vars
         run: |
           sudo ln -sf /usr/share/zoneinfo/Asia/Jakarta /etc/localtime
-          TIME=$(date '+%Y%m%d-%H%M')
-          BUILD_ID=$(date '+%Y%m%d%H%M%S')
-          echo "TIME=$TIME" >> $GITHUB_ENV
-          echo "BUILD_ID=$BUILD_ID" >> $GITHUB_ENV
+          echo "TIME=$(date '+%Y%m%d-%H%M')" >> $GITHUB_ENV
+          echo "BUILD_ID=$(date '+%Y%m%d%H%M%S')" >> $GITHUB_ENV
           echo "BUILD_START=$(date +%s)" >> $GITHUB_ENV
 
       - name: Add 4GB Swap
@@ -42,7 +40,7 @@ jobs:
             libncurses-dev libxml2-utils lzop python-is-python3 rsync \
             unzip zip wget xz-utils make clang lld libelf-dev \
             gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi \
-            device-tree-compiler
+            device-tree-compiler elfutils
 
       - name: Download Clang (r416183b)
         run: |
@@ -62,8 +60,8 @@ jobs:
 
       - name: Clean & Setup
         run: |
-          rm -rf out *.zip AnyKernel3 log.txt defconfig_snapshot.config
           make mrproper
+          rm -rf out *.zip AnyKernel3 log.txt defconfig_snapshot.config
 
       - name: Setup Defconfig
         run: |
@@ -71,20 +69,10 @@ jobs:
 
       - name: 🔎 Debug Clang Info
         run: |
-          echo "🔧 Clang location:"
-          which clang
-          echo
-
-          echo "📦 Clang version:"
-          clang --version
-          echo
-
-          echo "🎯 Clang target default:"
-          clang -v 2>&1 | grep Target:
-          echo
-
-          echo "📁 Triple binaries in clang/bin:"
-          ls clang/bin | grep --color=always 'aarch64' || true
+          echo "🔧 Clang location:" && which clang
+          echo -e "\n📦 Clang version:" && clang --version
+          echo -e "\n🎯 Clang target default:" && clang -v 2>&1 | grep Target:
+          echo -e "\n📁 Triple binaries in clang/bin:" && ls clang/bin | grep aarch64 || true
 
       - name: Compile Kernel (Image.gz-dtb only)
         run: |
@@ -93,16 +81,9 @@ jobs:
             ARCH=arm64 \
             CC=clang \
             HOSTCC=clang \
-            LD=ld.lld \
-            AR=llvm-ar \
-            AS=llvm-as \
-            NM=llvm-nm \
-            OBJCOPY=llvm-objcopy \
-            OBJDUMP=llvm-objdump \
-            STRIP=llvm-strip \
             CROSS_COMPILE=aarch64-linux-android- \
             CROSS_COMPILE_COMPAT=arm-linux-gnueabi- \
-            CLANG_TRIPLE=aarch64-linux-gnu- \
+            CLANG_TRIPLE=aarch64-linux-android- \
             LOCALVERSION= \
             KCFLAGS="-Wno-error" \
             Image.gz-dtb | tee log.txt
