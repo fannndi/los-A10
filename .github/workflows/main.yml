@@ -17,7 +17,7 @@ on:
         default: "false"
       disable_debug:
         description: "Disable Debug Configs (e.g. DEBUG_INFO, DEBUG_KERNEL)"
-        required: false
+        required: true
         default: "false"
 
 env:
@@ -154,8 +154,7 @@ jobs:
         if: ${{ github.event.inputs.disable_debug == 'true' }}
         run: |
           chmod +x scripts/config
-          scripts/config --file out/.config --disable DEBUG_INFO
-          scripts/config --file out/.config --disable DEBUG_KERNEL
+          scripts/config --file out/.config --disable MODVERSIONS
           make O=out ARCH=arm64 olddefconfig
 
       - name: Enable Experimental Options
