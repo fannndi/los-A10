@@ -39,10 +39,10 @@ jobs:
             unzip zip wget xz-utils make clang lld libelf-dev \
             device-tree-compiler elfutils
 
-      - name: Download Clang (Google Android 11 - r416183b)
+      - name: Download Clang
         run: |
           mkdir -p clang
-          curl -L 'https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/android11-release/clang-r416183b.tar.gz' | tar -xz -C clang
+          wget -q https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/main/clang-r536225.tar.gz -O - | tar -xz -C clang
           echo "$GITHUB_WORKSPACE/clang/bin" >> $GITHUB_PATH
 
       - name: Download GCC Toolchains
