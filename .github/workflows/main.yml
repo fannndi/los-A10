@@ -74,6 +74,7 @@ jobs:
           echo "SUBARCH=arm64" >> $GITHUB_ENV
 
       - name: Telegram - Build Started
+        shell: bash
         run: |
           MSG="🚀 *Kernel Build Started!*\n"
           MSG+="🧱 Defconfig: \`surya_defconfig\`\n"
@@ -131,6 +132,7 @@ jobs:
 
       - name: Telegram - Build Success
         if: success()
+        shell: bash
         run: |
           DURATION=$(( $(date +%s) - ${{ env.BUILD_START }} ))
           MSG="✅ *Kernel Build Success!*\n"
@@ -147,6 +149,7 @@ jobs:
 
       - name: Telegram - Log Upload
         if: always()
+        shell: bash
         run: |
           curl -s -F document=@log.txt \
             -F caption="📄 Build Log" \
