@@ -113,12 +113,6 @@ jobs:
             zip \
             zstd
 
-      - name: Cache Clang
-        uses: actions/cache@v3
-        with:
-          path: clang
-          key: clang-r536225
-
       - name: Check & Download
         run: |
           if [[ ! -f "clang/bin/clang" || ! -f "clang/bin/ld.lld" ]]; then
