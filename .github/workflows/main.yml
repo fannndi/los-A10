@@ -88,21 +88,8 @@ jobs:
       - name: Experimental Options
         run: |
           chmod +x scripts/config
-          scripts/config --file out/.config \
-            --disable MODVERSIONS \
-            --disable LTO_CLANG \
-            --disable LTO_NONE \
-            --enable LTO_CLANG_FULL
+          scripts/config --file out/.config --disable MODVERSIONS
           make O=out ARCH=arm64 olddefconfig
-          grep LTO out/.config
-      
-      - name: Dump LTO Config
-        run: grep LTO out/.config || true
-
-      - name: Check Toolchain Linker
-        run: |
-          which ld.lld
-          ld.lld --version || true
 
       - name: Compile Kernel
         run: |
