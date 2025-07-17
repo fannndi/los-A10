@@ -69,6 +69,23 @@ jobs:
         run: |
           make O=out ARCH=arm64 surya_defconfig
 
+      - name: 🔎 Debug Clang Info
+        run: |
+          echo "🔧 Clang location:"
+          which clang
+          echo
+
+          echo "📦 Clang version:"
+          clang --version
+          echo
+
+          echo "🎯 Clang target default:"
+          clang -v 2>&1 | grep Target:
+          echo
+
+          echo "📁 Triple binaries in clang/bin:"
+          ls clang/bin | grep --color=always 'aarch64' || true
+
       - name: Compile Kernel (Image.gz-dtb only)
         run: |
           echo -e "\n📦 Starting compilation...\n"
