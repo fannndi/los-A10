@@ -8,7 +8,6 @@ env:
   TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
   BUILD_USER: fannndi
   BUILD_HOST: github
-  CLANG_TRIPLE: aarch64-linux-android-
 
 jobs:
   build:
@@ -24,11 +23,11 @@ jobs:
           sudo ln -sf /usr/share/zoneinfo/Asia/Jakarta /etc/localtime
           TIME=$(date '+%Y%m%d-%H%M')
           BUILD_ID=$(date '+%Y%m%d%H%M%S')
+          echo "TIME=$TIME" >> $GITHUB_ENV
           echo "BUILD_ID=$BUILD_ID" >> $GITHUB_ENV
           echo "BUILD_START=$(date +%s)" >> $GITHUB_ENV
-          echo "TIME=$TIME" >> $GITHUB_ENV
 
-      - name: Create Swap (4GB)
+      - name: Add 4GB Swap
         run: |
           sudo fallocate -l 4G /swapfile
           sudo chmod 600 /swapfile
@@ -39,59 +38,40 @@ jobs:
         run: |
           sudo apt update
           sudo apt install -y \
-            abootimg android-sdk-libsparse-utils bc binutils bison build-essential ccache clang cmake cpio \
-            curl device-tree-compiler flex gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi gettext git jq kmod \
-            libelf-dev libfdt-dev liblz4-tool libncurses5-dev libncursesw5-dev libssl-dev libudev-dev \
-            libxml2-utils libzstd-dev llvm lsb-release lz4 lzop make nano ninja-build openssl patchutils \
-            pigz protobuf-compiler python-is-python3 python3 python3-mako python3-pip python3-virtualenv \
-            rsync unzip wget xz-utils zip zstd
+            bc build-essential bison ccache curl flex git libssl-dev \
+            libncurses-dev libxml2-utils lzop python-is-python3 rsync \
+            unzip zip wget xz-utils make clang lld libelf-dev \
+            gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi \
+            device-tree-compiler
 
-      - name: Download Clang (Android 12 - r416183b)
+      - name: Download Clang (r416183b)
         run: |
           mkdir -p clang
           wget -q https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/android12-release/clang-r416183b.tar.gz -O - | tar -xz -C clang
           echo "$GITHUB_WORKSPACE/clang/bin" >> $GITHUB_PATH
-          echo "TOOLCHAIN_PATH=$GITHUB_WORKSPACE/clang" >> $GITHUB_ENV
-
-      - name: Get Clang Version
-        id: clang
-        run: echo "version=$(clang/bin/clang --version | head -n1)" >> $GITHUB_OUTPUT
-
-      - name: Clean Output Directory
-        run: rm -rf out *.zip AnyKernel3 log.txt dtb.img dtbo.img Image.gz-dtb
 
       - name: Telegram - Build Started
         run: |
           MSG="🚀 *Kernel Build Started!*\n"
           MSG+="🧱 Defconfig: \`surya_defconfig\`\n"
-          MSG+="🛠️ Clang: \`${{ steps.clang.outputs.version }}\`"
+          MSG+="🛠️ Clang: \`r416183b\`"
           curl -s -X POST https://api.telegram.org/bot${{ env.TELEGRAM_BOT_TOKEN }}/sendMessage \
             -d chat_id=${{ env.TELEGRAM_CHAT_ID }} \
             -d text="$MSG" \
             -d parse_mode=Markdown
 
-      - name: Make Defconfig
+      - name: Clean & Setup
         run: |
+          rm -rf out *.zip AnyKernel3 log.txt defconfig_snapshot.config
           make mrproper
-          make O=out ARCH=arm64 CLANG_TRIPLE=${{ env.CLANG_TRIPLE }} surya_defconfig
-          make O=out ARCH=arm64 CLANG_TRIPLE=${{ env.CLANG_TRIPLE }} olddefconfig
 
-      - name: Get Kernel Version from .config
+      - name: Setup Defconfig
         run: |
-          VERSION=$(grep -oP '(?<=CONFIG_LOCALVERSION=")([^"]+)' out/.config || git rev-parse --short HEAD)
-          ZIPNAME="MIUI-A10-${VERSION}-${TIME}.zip"
-          echo "ZIPNAME=$ZIPNAME" >> $GITHUB_ENV
-          echo "KERNEL_VERSION=$VERSION" >> $GITHUB_ENV
+          make O=out ARCH=arm64 surya_defconfig
 
-      - name: Compile Kernel (Manual Image.gz-dtb)
+      - name: Compile Kernel (Image.gz-dtb only)
         run: |
-          export CROSS_COMPILE=aarch64-linux-android-
-          export CROSS_COMPILE_ARM32=arm-linux-gnueabi-
-          export CLANG_TRIPLE=aarch64-linux-android-
-          export PATH="${GITHUB_WORKSPACE}/clang/bin:${PATH}"
-
           echo -e "\n📦 Starting compilation...\n"
-
           make -j$(nproc) O=out \
             ARCH=arm64 \
             CC=clang \
@@ -102,74 +82,61 @@ jobs:
             OBJCOPY=llvm-objcopy \
             OBJDUMP=llvm-objdump \
             STRIP=llvm-strip \
-            CROSS_COMPILE=${CROSS_COMPILE} \
-            CROSS_COMPILE_COMPAT=${CROSS_COMPILE_ARM32} \
-            CLANG_TRIPLE=${CLANG_TRIPLE} \
+            CROSS_COMPILE=aarch64-linux-android- \
+            CROSS_COMPILE_COMPAT=arm-linux-gnueabi- \
+            CLANG_TRIPLE=aarch64-linux-android- \
             KCFLAGS="-Wno-error" \
             LOCALVERSION= \
-            Image dtbs | tee log.txt
+            Image.gz-dtb | tee log.txt
 
-          if [ ! -f out/arch/arm64/boot/Image ]; then
-            echo "::error ::Image not found!"
+          if [ ! -f out/arch/arm64/boot/Image.gz-dtb ]; then
+            echo "::error ::Image.gz-dtb not generated!"
             exit 1
           fi
-
-          find out/arch/arm64/boot/dts -name "*.dtb" | sort | xargs cat > dtb.img
-          cat out/arch/arm64/boot/Image dtb.img | gzip -9 > Image.gz-dtb
 
       - name: Save Final .config
         run: cp out/.config defconfig_snapshot.config
 
-      - name: Create Kernel Zip
+      - name: Package with AnyKernel3
         run: |
           git clone --depth=1 https://github.com/rinnsakaguchi/AnyKernel3 -b FSociety
-          cp Image.gz-dtb dtb.img AnyKernel3/ 2>/dev/null || true
-          cd AnyKernel3 && zip -r9 ../${{ env.ZIPNAME }} ./* -x '*.git*' README.md *placeholder
+          cp out/arch/arm64/boot/Image.gz-dtb AnyKernel3/
+          cd AnyKernel3
+          zip -r9 ../MIUI-A10-${{ env.TIME }}.zip ./* -x '*.git*' README.md *placeholder
 
       - name: Telegram - Build Success
         if: success()
         run: |
           DURATION=$(( $(date +%s) - ${{ env.BUILD_START }} ))
           MSG="✅ *Kernel Build Success!*\n"
-          MSG+="📦 *Name:* \`${{ env.ZIPNAME }}\`\n"
-          MSG+="🕒 *Duration:* ${DURATION}s\n"
+          MSG+="🕒 *Time:* ${DURATION}s\n"
+          MSG+="📦 *File:* \`MIUI-A10-${{ env.TIME }}.zip\`"
           curl -s -X POST https://api.telegram.org/bot${{ env.TELEGRAM_BOT_TOKEN }}/sendMessage \
             -d chat_id=${{ env.TELEGRAM_CHAT_ID }} \
             -d text="$MSG" \
             -d parse_mode=Markdown
-
-          curl -s -F document=@${{ env.ZIPNAME }} \
+          curl -s -F document=@MIUI-A10-${{ env.TIME }}.zip \
             -F caption="✅ Kernel Zip" \
             -F chat_id=${{ env.TELEGRAM_CHAT_ID }} \
             https://api.telegram.org/bot${{ env.TELEGRAM_BOT_TOKEN }}/sendDocument
 
-      - name: Telegram - Build Log
+      - name: Telegram - Log Upload
         if: always()
         run: |
-          STATUS="Build Log"
-          [[ failure() ]] && STATUS="❌ Failed Log"
           curl -s -F document=@log.txt \
-            -F caption="📄 $STATUS\n🆔 \`${{ env.BUILD_ID }}\`" \
+            -F caption="📄 Build Log" \
             -F chat_id=${{ env.TELEGRAM_CHAT_ID }} \
             https://api.telegram.org/bot${{ env.TELEGRAM_BOT_TOKEN }}/sendDocument
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: build-output
+          name: Kernel Image
           path: |
-            ${{ env.ZIPNAME }}
+            MIUI-A10-${{ env.TIME }}.zip
             log.txt
-            out/.config
             defconfig_snapshot.config
 
-      - name: Show Info
-        if: success()
-        run: |
-          echo "✅ Done: ${{ env.ZIPNAME }}"
-          du -sh "${{ env.ZIPNAME }}"
-          sha1sum "${{ env.ZIPNAME }}"
-
-      - name: Disable Swap
+      - name: Turn off Swap
         if: always()
         run: sudo swapoff /swapfile
